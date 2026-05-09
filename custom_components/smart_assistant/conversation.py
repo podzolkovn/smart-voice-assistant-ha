@@ -1,9 +1,9 @@
 from __future__ import annotations
 import logging
 from homeassistant.core import HomeAssistant
-from homeassistant.components import conversation
-from homeassistant.components.conversation import AbstractConversationAgent
-from homeassistant.components.conversation.models import ConversationInput, ConversationResult
+from homeassistant.components.conversation import ConversationResult, AbstractConversationAgent
+from homeassistant.components.conversation.models import ConversationInput
+from homeassistant.intent import IntentResponse
 
 from .nlp import (
     normalize_text,
@@ -30,7 +30,6 @@ class SmartAssistant(AbstractConversationAgent):
         text = user_input.text.lower()
         _LOGGER.debug("Команда: %s", text)
 
-        # Индексы строим каждый раз — устройства всегда актуальны
         device_index = build_search_index(self.hass)
         action_index = build_action_index(self.hass)
 
@@ -71,7 +70,6 @@ class SmartAssistant(AbstractConversationAgent):
                 failed.append(f"Ошибка {entity_id}: {str(e)}")
                 _LOGGER.error("Ошибка: %s", str(e))
 
-        # Формируем ответ
         if executed and not failed:
             response_text = "Готово! " + ", ".join(executed)
         elif executed and failed:
@@ -79,7 +77,11 @@ class SmartAssistant(AbstractConversationAgent):
         else:
             response_text = "Не удалось: " + ", ".join(failed)
 
+        # Правильный формат ответа для HA
+        intent_response = IntentResponse(language=user_input.language)
+        intent_response.async_set_speech(response_text)
+
         return ConversationResult(
-            response=response_text,
+            response=intent_response,
             conversation_id=user_input.conversation_id
         )
