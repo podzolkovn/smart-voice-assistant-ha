@@ -45,7 +45,7 @@ class SmartAssistant(AbstractConversationAgent):
                 failed.append(f"Не понял действие: '{part}'")
                 continue
 
-            entity_id = find_device(" ".join(tokens), device_index)
+            entity_id = find_device(" ".join(tokens), device_index, service)
             if not entity_id:
                 failed.append(f"Устройство не найдено: '{part}'")
                 continue
