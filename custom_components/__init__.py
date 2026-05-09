@@ -10,11 +10,19 @@ _LOGGER = logging.getLogger(__name__)
 DOMAIN = "smart_assistant"
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    agent = SmartAssistant(hass)
-    conversation.async_set_agent(hass, entry, agent)
-    _LOGGER.info("Smart Assistant запущен")
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    try:
+        agent = SmartAssistant(hass)
+        conversation.async_set_agent(hass, entry, agent)
+        _LOGGER.info("Smart Assistant запущен")
+        return True
+    except Exception as e:
+        _LOGGER.error("Ошибка запуска Smart Assistant: %s", str(e))
+        return False
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
