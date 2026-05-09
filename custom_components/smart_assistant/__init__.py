@@ -2,7 +2,7 @@ from __future__ import annotations
 import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.components import conversation
+from homeassistant.components.conversation import async_set_agent
 
 from .conversation import SmartAssistant
 
@@ -23,7 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         await hass.async_add_executor_job(_init_morph)
         agent = SmartAssistant(hass)
-        conversation.async_set_agent(hass, entry, agent)
+        async_set_agent(hass, entry, agent)
         _LOGGER.info("Smart Assistant запущен")
         return True
     except Exception as e:
@@ -32,5 +32,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    conversation.async_unset_agent(hass, entry)
+    from homeassistant.components.conversation import async_unset_agent
+    async_unset_agent(hass, entry)
     return True

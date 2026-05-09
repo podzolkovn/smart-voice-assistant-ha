@@ -1,4 +1,4 @@
-import pymorphy2
+import pymorphy3
 
 _morph = None
 
@@ -6,7 +6,7 @@ _morph = None
 def get_morph():
     global _morph
     if _morph is None:
-        _morph = pymorphy2.MorphAnalyzer()
+        _morph = pymorphy3.MorphAnalyzer()
     return _morph
 
 
