@@ -10,18 +10,24 @@ _LOGGER = logging.getLogger(__name__)
 DOMAIN = "smart_assistant"
 
 
+def _init_morph():
+    from .nlp.morphology import get_morph
+    get_morph()
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
+        await hass.async_add_executor_job(_init_morph)
         agent = SmartAssistant(hass)
         conversation.async_set_agent(hass, entry, agent)
         _LOGGER.info("Smart Assistant запущен")
         return True
     except Exception as e:
-        _LOGGER.error("Ошибка запуска Smart Assistant: %s", str(e))
+        _LOGGER.error("Ошибка: %s", str(e))
         return False
 
 

@@ -1,10 +1,17 @@
 import pymorphy2
 
-morph = pymorphy2.MorphAnalyzer()
+_morph = None
+
+
+def get_morph():
+    global _morph
+    if _morph is None:
+        _morph = pymorphy2.MorphAnalyzer()
+    return _morph
 
 
 def normalize(word: str) -> str:
-    return morph.parse(word)[0].normal_form
+    return get_morph().parse(word)[0].normal_form
 
 
 def normalize_text(text: str) -> list[str]:
