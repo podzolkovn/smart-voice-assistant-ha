@@ -1,9 +1,8 @@
 from __future__ import annotations
 import logging
 from homeassistant.core import HomeAssistant
-from homeassistant.components.conversation import ConversationResult, AbstractConversationAgent
-from homeassistant.components.conversation.models import ConversationInput
-from homeassistant.intent import IntentResponse
+from homeassistant.components.conversation import AbstractConversationAgent, ConversationResult
+from homeassistant.components.conversation.models import ConversationInput, intent
 
 from .nlp import (
     normalize_text,
@@ -77,8 +76,8 @@ class SmartAssistant(AbstractConversationAgent):
         else:
             response_text = "Не удалось: " + ", ".join(failed)
 
-        # Правильный формат ответа для HA
-        intent_response = IntentResponse(language=user_input.language)
+        # Правильный формат для HA 2026
+        intent_response = intent.IntentResponse(language=user_input.language)
         intent_response.async_set_speech(response_text)
 
         return ConversationResult(
