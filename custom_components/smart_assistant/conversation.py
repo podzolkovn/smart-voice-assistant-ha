@@ -11,6 +11,7 @@ from .nlp import (
     build_action_index,
     find_action,
     split_commands,
+    extract_media_title,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -54,11 +55,23 @@ class SmartAssistant(AbstractConversationAgent):
                 failed.append(f"Команда '{service}' недоступна для {entity_id}")
                 continue
 
+            # Формируем параметры команды
+            service_data: dict = {"entity_id": entity_id}
+
+            if service == "play_media":
+                title = extract_media_title(tokens)
+                if not title:
+                    failed.append(f"Не указано что воспроизвести: '{part}'")
+                    continue
+                service_data["media_content_id"] = title
+                service_data["media_content_type"] = "music"
+                _LOGGER.debug("Воспроизведение: %s", title)
+
             try:
                 await self.hass.services.async_call(
                     domain=domain,
                     service=service,
-                    service_data={"entity_id": entity_id}
+                    service_data=service_data
                 )
                 state = self.hass.states.get(entity_id)
                 name = state.attributes.get("friendly_name", entity_id) if state else entity_id
@@ -76,7 +89,6 @@ class SmartAssistant(AbstractConversationAgent):
         else:
             response_text = "Не удалось: " + ", ".join(failed)
 
-        # Правильный формат для HA 2026
         intent_response = intent.IntentResponse(language=user_input.language)
         intent_response.async_set_speech(response_text)
 
