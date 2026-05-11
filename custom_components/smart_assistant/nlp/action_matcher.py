@@ -4,6 +4,11 @@ from .dictionaries import (
     AUTO_TRANSLATE,
     PURIFIER_MODES,
     HUMIDIFIER_FAN_LEVELS,
+    HUMIDIFIER_MODES,
+    LIGHT_COLORS,
+    LIGHT_COLOR_TEMP,
+    LIGHT_EFFECTS,
+    LIGHT_BRIGHTNESS,
     STATE_QUERY_KEYWORDS,
     SPLITTERS,
     STATE_STOP_WORDS,
@@ -39,7 +44,68 @@ def extract_preset_mode(tokens: list[str], domain: str) -> str | None:
         for token in tokens:
             if token in HUMIDIFIER_FAN_LEVELS:
                 return HUMIDIFIER_FAN_LEVELS[token]
+    if domain == "humidifier":
+        for token in tokens:
+            if token in HUMIDIFIER_MODES:
+                return HUMIDIFIER_MODES[token]
     return None
+
+
+def extract_light_params(tokens: list[str]) -> dict:
+    """Извлекаем параметры лампы из токенов"""
+    params = {}
+
+    # Ищем RGB цвет
+    for token in tokens:
+        if token in LIGHT_COLORS:
+            r, g, b = LIGHT_COLORS[token]
+            params["hs_color"] = _rgb_to_hs(r, g, b)
+            return params
+
+    # Ищем температуру цвета
+    for token in tokens:
+        if token in LIGHT_COLOR_TEMP:
+            params["color_temp_kelvin"] = LIGHT_COLOR_TEMP[token]
+            return params
+
+    # Ищем эффект
+    for token in tokens:
+        if token in LIGHT_EFFECTS:
+            params["effect"] = LIGHT_EFFECTS[token]
+            return params
+
+    # Ищем яркость по слову
+    for token in tokens:
+        if token in LIGHT_BRIGHTNESS:
+            params["brightness"] = LIGHT_BRIGHTNESS[token]
+            return params
+
+    # Ищем яркость по числу (1-100%)
+    number = extract_number(tokens)
+    if number:
+        params["brightness"] = int(number * 2.55)
+
+    return params
+
+
+def _rgb_to_hs(r: int, g: int, b: int) -> tuple[float, float]:
+    """Конвертируем RGB в HS (Hue, Saturation)"""
+    r, g, b = r / 255.0, g / 255.0, b / 255.0
+    max_c = max(r, g, b)
+    min_c = min(r, g, b)
+    diff = max_c - min_c
+
+    if diff == 0:
+        h = 0
+    elif max_c == r:
+        h = (60 * ((g - b) / diff) + 360) % 360
+    elif max_c == g:
+        h = (60 * ((b - r) / diff) + 120) % 360
+    else:
+        h = (60 * ((r - g) / diff) + 240) % 360
+
+    s = 0 if max_c == 0 else (diff / max_c) * 100
+    return round(h, 1), round(s, 1)
 
 
 def build_action_index(hass: HomeAssistant) -> dict[str, str]:

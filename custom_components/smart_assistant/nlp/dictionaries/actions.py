@@ -27,13 +27,31 @@ BASE_SYNONYMS = {
     # Скорость
     "скорость": "set_percentage",
     "мощность": "set_percentage",
+
+    # Лампа — яркость
+    "ярче":    "light_brightness_up",
+    "темнее":  "light_brightness_down",
+    "яркость": "light_set_brightness",
+
+    # Лампа — цвет
+    "цвет":    "light_set_color",
+    "покрась": "light_set_color",
+
+    # Лампа — эффект
+    "эффект":  "light_set_effect",
+    "режим":   "light_set_effect",
 }
 
 AUTO_TRANSLATE = {
-    "turn_on":         ["включить", "врубить", "запустить"],
-    "turn_off":        ["выключить", "вырубить", "отключить"],
-    "toggle":          ["переключить"],
-    "set_preset_mode": ["режим", "поставить", "установить"],
-    "set_humidity":    ["влажность"],
-    "set_percentage":  ["скорость", "мощность"],
+    "turn_on":              ["включить", "врубить", "запустить"],
+    "turn_off":             ["выключить", "вырубить", "отключить"],
+    "toggle":               ["переключить"],
+    "set_preset_mode":      ["режим", "поставить", "установить"],
+    "set_humidity":         ["влажность"],
+    "set_percentage":       ["скорость", "мощность"],
+    "light_brightness_up":  ["ярче", "светлее"],
+    "light_brightness_down":["темнее", "приглуши"],
+    "light_set_brightness": ["яркость"],
+    "light_set_color":      ["цвет", "покрась", "сделай"],
+    "light_set_effect":     ["эффект"],
 }

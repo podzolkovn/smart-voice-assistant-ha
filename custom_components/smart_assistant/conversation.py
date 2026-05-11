@@ -105,46 +105,68 @@ class SmartAssistant(AbstractConversationAgent):
         return f"{name} {state_text}"
 
     async def _handle_device(self, tokens, action_index, device_index, part) -> str | None:
-        """Обработка команд устройствами"""
         service = find_action(tokens, action_index)
+        _LOGGER.debug("Найденное действие: %s для токенов: %s", service, tokens)
         if not service:
             return None
 
         entity_id = find_device(" ".join(tokens), device_index, service)
+        _LOGGER.debug("Найденное устройство: %s", entity_id)
         if not entity_id:
             return None
 
         domain = entity_id.split(".")[0]
-        service_data = self._build_service_data(tokens, service, entity_id, domain)
 
+        # Для лампы — все кастомные сервисы → light/turn_on
+        ha_service = service
+        if service in ("light_brightness_up", "light_brightness_down",
+                       "light_set_brightness", "light_set_color", "light_set_effect"):
+            ha_service = "turn_on"
+            domain = "light"
+
+        service_data = self._build_service_data(tokens, service, entity_id, domain)
         if service_data is None:
             return None
 
-        if not self.hass.services.has_service(domain, service):
+        if not self.hass.services.has_service(domain, ha_service):
             return None
 
         try:
             await self.hass.services.async_call(
                 domain=domain,
-                service=service,
+                service=ha_service,
                 service_data=service_data
             )
             state = self.hass.states.get(entity_id)
             name = state.attributes.get("friendly_name", entity_id) if state else entity_id
-            _LOGGER.info("Выполнено: %s → %s", entity_id, service)
+            _LOGGER.info("Выполнено: %s → %s", entity_id, ha_service)
             return name
         except Exception as e:
             _LOGGER.error("Ошибка: %s", str(e))
             return None
 
-    def _build_service_data(
-        self,
-        tokens: list[str],
-        service: str,
-        entity_id: str,
-        domain: str
-    ) -> dict | None:
-        """Формируем параметры команды"""
+    def _build_service_data(self, tokens, service, entity_id, domain) -> dict | None:
+        from .nlp.action_matcher import extract_light_params
+
+        # Лампа — включить с параметрами
+        if domain == "light" and service == "turn_on":
+            params = extract_light_params(tokens)
+            return {"entity_id": entity_id, **params}
+
+        # Лампа — яркость вверх
+        if service == "light_brightness_up":
+            return {"entity_id": entity_id, "brightness_step_pct": 20}
+
+        # Лампа — яркость вниз
+        if service == "light_brightness_down":
+            return {"entity_id": entity_id, "brightness_step_pct": -20}
+
+        # Лампа — установить яркость/цвет/эффект
+        if service in ("light_set_brightness", "light_set_color", "light_set_effect"):
+            params = extract_light_params(tokens)
+            if not params:
+                return None
+            return {"entity_id": entity_id, **params}
 
         # Режим очистителя
         if service == "set_preset_mode":
@@ -153,6 +175,11 @@ class SmartAssistant(AbstractConversationAgent):
                 if not mode:
                     return None
                 return {"entity_id": entity_id, "preset_mode": mode}
+            if domain == "humidifier":
+                mode = extract_preset_mode(tokens, "humidifier")
+                if not mode:
+                    return None
+                return {"entity_id": entity_id, "mode": mode}
             return None
 
         # Влажность увлажнителя
@@ -176,5 +203,4 @@ class SmartAssistant(AbstractConversationAgent):
                 return None
             return {"entity_id": entity_id, "option": level}
 
-        # Все остальные команды
         return {"entity_id": entity_id}
