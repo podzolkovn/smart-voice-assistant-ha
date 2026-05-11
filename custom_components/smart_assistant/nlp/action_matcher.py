@@ -1,32 +1,30 @@
 from homeassistant.core import HomeAssistant
 
-# Ключевые слова для определения контекста музыки
 MEDIA_KEYWORDS = ["музыку", "музыка", "песню", "песня", "трек", "сыграть"]
 
+STATE_QUERY_KEYWORDS = [
+    "какой", "какая", "какое", "сколько", "что",
+    "температура", "влажность", "состояние", "статус",
+    "включён", "выключен", "работает", "показывает"
+]
+
 BASE_SYNONYMS = {
-    # Включить
     "включить": "turn_on",
     "включать": "turn_on",
     "врубить": "turn_on",
     "запустить": "turn_on",
     "активировать": "turn_on",
-
-    # Выключить
     "выключить": "turn_off",
     "выключать": "turn_off",
     "вырубить": "turn_off",
     "отключить": "turn_off",
     "остановить": "turn_off",
-
-    # Громкость
     "убавить": "volume_down",
     "приглушить": "volume_down",
     "потише": "volume_down",
     "громче": "volume_up",
     "прибавить": "volume_up",
     "погромче": "volume_up",
-
-    # Медиа
     "пауза": "media_pause",
     "играть": "play_media",
     "сыграть": "play_media",
@@ -34,8 +32,6 @@ BASE_SYNONYMS = {
     "следующий": "media_next_track",
     "предыдущий": "media_previous_track",
     "стоп": "media_stop",
-
-    # Переключить
     "переключить": "toggle",
 }
 
@@ -56,6 +52,26 @@ AUTO_TRANSLATE = {
 SPLITTERS = ["и", "а также", "потом", "затем", "а ещё"]
 
 
+def detect_command_type(tokens: list[str]) -> str:
+    """Определяем тип команды: device / music / state_query"""
+    has_media = any(t in MEDIA_KEYWORDS for t in tokens)
+    has_state_query = any(t in STATE_QUERY_KEYWORDS for t in tokens)
+    has_action = any(t in BASE_SYNONYMS for t in tokens)
+
+    if has_state_query and not has_action:
+        return "state_query"
+    if has_media or any(t in ("играть", "сыграть", "воспроизвести") for t in tokens):
+        return "music"
+    return "device"
+
+
+def extract_state_query(tokens: list[str]) -> str | None:
+    """Извлекаем объект запроса состояния"""
+    STOP_WORDS = {"какой", "какая", "какое", "сколько", "что", "у", "в", "на", "сейчас"}
+    query_tokens = [t for t in tokens if t not in STOP_WORDS and len(t) > 2]
+    return " ".join(query_tokens) if query_tokens else None
+
+
 def build_action_index(hass: HomeAssistant) -> dict[str, str]:
     index = dict(BASE_SYNONYMS)
     services = hass.services.async_services()
@@ -68,13 +84,10 @@ def build_action_index(hass: HomeAssistant) -> dict[str, str]:
 
 
 def find_action(tokens: list[str], action_index: dict[str, str]) -> str | None:
-    # Если есть музыкальный контекст + включить → play_media
     has_media = any(t in MEDIA_KEYWORDS for t in tokens)
-
     for token in tokens:
         if token in action_index:
             service = action_index[token]
-            # "включи музыку" → play_media вместо turn_on
             if has_media and service == "turn_on":
                 return "play_media"
             return service
@@ -82,13 +95,11 @@ def find_action(tokens: list[str], action_index: dict[str, str]) -> str | None:
 
 
 def extract_media_title(tokens: list[str]) -> str | None:
-    """Извлекаем название трека из токенов"""
-    # Стоп-слова которые не являются названием
     STOP_WORDS = {
         "включить", "включи", "сыграть", "сыграй", "играть",
         "воспроизвести", "поставить", "алиса", "станция",
         "колонка", "яндекс", "музыку", "музыка", "песню",
-        "на", "у", "в", "по"
+        "на", "у", "в", "по", "трек"
     }
     title_tokens = [t for t in tokens if t not in STOP_WORDS and len(t) > 1]
     return " ".join(title_tokens) if title_tokens else None
