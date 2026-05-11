@@ -4,9 +4,10 @@ from .action_matcher import (
     build_action_index,
     find_action,
     split_commands,
-    extract_media_title,
     detect_command_type,
     extract_state_query,
+    extract_number,
+    extract_preset_mode,
 )
 
 __all__ = [
@@ -17,7 +18,8 @@ __all__ = [
     "build_action_index",
     "find_action",
     "split_commands",
-    "extract_media_title",
     "detect_command_type",
     "extract_state_query",
+    "extract_number",
+    "extract_preset_mode",
 ]

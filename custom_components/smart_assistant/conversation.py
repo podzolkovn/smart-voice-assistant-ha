@@ -1,6 +1,5 @@
 from __future__ import annotations
 import logging
-import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.components.conversation import AbstractConversationAgent, ConversationResult
 from homeassistant.components.conversation.models import ConversationInput, intent
@@ -12,14 +11,13 @@ from .nlp import (
     build_action_index,
     find_action,
     split_commands,
-    extract_media_title,
     detect_command_type,
     extract_state_query,
+    extract_number,
+    extract_preset_mode,
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-MUSIC_ASSISTANT_URL = "http://localhost:8095"
 
 
 class SmartAssistant(AbstractConversationAgent):
@@ -47,23 +45,12 @@ class SmartAssistant(AbstractConversationAgent):
             cmd_type = detect_command_type(tokens)
 
             if cmd_type == "state_query":
-                # Запрос состояния устройства
                 result = await self._handle_state_query(tokens, device_index)
                 if result:
                     executed.append(result)
                 else:
                     failed.append(f"Не нашёл информацию: '{part}'")
-
-            elif cmd_type == "music":
-                # Музыкальная команда через Music Assistant
-                result = await self._handle_music(tokens, device_index, part)
-                if result:
-                    executed.append(result)
-                else:
-                    failed.append(f"Не удалось воспроизвести: '{part}'")
-
             else:
-                # Обычная команда устройством
                 result = await self._handle_device(tokens, action_index, device_index, part)
                 if result:
                     executed.append(result)
@@ -101,131 +88,21 @@ class SmartAssistant(AbstractConversationAgent):
 
         name = state.attributes.get("friendly_name", entity_id)
 
-        # Температура
         if "temperature" in entity_id or "temp" in entity_id:
             unit = state.attributes.get("unit_of_measurement", "°C")
             return f"{name}: {state.state}{unit}"
 
-        # Влажность
         if "humidity" in entity_id:
             return f"{name}: {state.state}%"
 
-        # Обычное состояние
         state_map = {
-            "on": "включён",
-            "off": "выключен",
-            "idle": "в режиме ожидания",
-            "playing": "воспроизводит",
-            "paused": "на паузе",
+            "on":          "включён",
+            "off":         "выключен",
+            "idle":        "в режиме ожидания",
             "unavailable": "недоступен",
         }
         state_text = state_map.get(state.state, state.state)
         return f"{name} {state_text}"
-
-    async def _handle_music(self, tokens: list[str], device_index: dict, part: str) -> str | None:
-        """Обработка музыкальных команд через Music Assistant"""
-        title = extract_media_title(tokens)
-
-        # Ищем устройство для воспроизведения
-        entity_id = find_device(" ".join(tokens), device_index, "play_media")
-
-        if not entity_id:
-            # Если устройство не указано — используем Яндекс Лайт по умолчанию
-            for eid in self.hass.states.async_entity_ids("media_player"):
-                if "yandex" in eid.lower():
-                    entity_id = eid
-                    break
-
-        if not entity_id:
-            return None
-
-        state = self.hass.states.get(entity_id)
-        player_name = state.attributes.get("friendly_name", entity_id) if state else entity_id
-
-        if not title:
-            # Без названия — просто play
-            try:
-                await self.hass.services.async_call(
-                    domain="media_player",
-                    service="media_play",
-                    service_data={"entity_id": entity_id}
-                )
-                return f"Воспроизвожу на {player_name}"
-            except Exception as e:
-                _LOGGER.error("Ошибка воспроизведения: %s", e)
-                return None
-
-        # Ищем трек в Music Assistant
-        try:
-            ma_player_id = await self._get_ma_player_id(entity_id)
-            if ma_player_id:
-                success = await self._play_via_music_assistant(title, ma_player_id)
-                if success:
-                    return f"Включаю {title} на {player_name}"
-
-            # Fallback — через HA напрямую
-            await self.hass.services.async_call(
-                domain="media_player",
-                service="play_media",
-                service_data={
-                    "entity_id": entity_id,
-                    "media_content_id": title,
-                    "media_content_type": "music"
-                }
-            )
-            return f"Включаю {title} на {player_name}"
-
-        except Exception as e:
-            _LOGGER.error("Ошибка музыки: %s", e)
-            return None
-
-    async def _get_ma_player_id(self, entity_id: str) -> str | None:
-        """Получаем ID плеера в Music Assistant по entity_id"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(f"{MUSIC_ASSISTANT_URL}/api/players") as resp:
-                    if resp.status == 200:
-                        players = await resp.json()
-                        for player in players:
-                            if entity_id in str(player.get("extra_data", {})):
-                                return player["player_id"]
-                            if entity_id.split(".")[-1] in player.get("player_id", ""):
-                                return player["player_id"]
-        except Exception as e:
-            _LOGGER.error("MA players error: %s", e)
-        return None
-
-    async def _play_via_music_assistant(self, title: str, player_id: str) -> bool:
-        """Воспроизведение через Music Assistant API"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                # Поиск трека
-                async with session.get(
-                        f"{MUSIC_ASSISTANT_URL}/api/search",
-                        params={"query": title, "media_types": "track", "limit": "1"}
-                ) as resp:
-                    if resp.status != 200:
-                        return False
-                    results = await resp.json()
-
-                tracks = results.get("tracks", [])
-                if not tracks:
-                    return False
-
-                track_uri = tracks[0].get("uri")
-                if not track_uri:
-                    return False
-
-                # Воспроизвести
-                async with session.post(
-                        f"{MUSIC_ASSISTANT_URL}/api/players/{player_id}/play_media",
-                        json={"uri": track_uri, "media_type": "track"}
-                ) as resp:
-                    return resp.status in (200, 204)
-
-        except Exception as e:
-            _LOGGER.error("MA play error: %s", e)
-            return False
 
     async def _handle_device(self, tokens, action_index, device_index, part) -> str | None:
         """Обработка команд устройствами"""
@@ -238,10 +115,13 @@ class SmartAssistant(AbstractConversationAgent):
             return None
 
         domain = entity_id.split(".")[0]
-        if not self.hass.services.has_service(domain, service):
+        service_data = self._build_service_data(tokens, service, entity_id, domain)
+
+        if service_data is None:
             return None
 
-        service_data: dict = {"entity_id": entity_id}
+        if not self.hass.services.has_service(domain, service):
+            return None
 
         try:
             await self.hass.services.async_call(
@@ -256,3 +136,45 @@ class SmartAssistant(AbstractConversationAgent):
         except Exception as e:
             _LOGGER.error("Ошибка: %s", str(e))
             return None
+
+    def _build_service_data(
+        self,
+        tokens: list[str],
+        service: str,
+        entity_id: str,
+        domain: str
+    ) -> dict | None:
+        """Формируем параметры команды"""
+
+        # Режим очистителя
+        if service == "set_preset_mode":
+            if domain == "fan":
+                mode = extract_preset_mode(tokens, "fan")
+                if not mode:
+                    return None
+                return {"entity_id": entity_id, "preset_mode": mode}
+            return None
+
+        # Влажность увлажнителя
+        if service == "set_humidity":
+            number = extract_number(tokens)
+            if not number:
+                return None
+            return {"entity_id": entity_id, "humidity": number}
+
+        # Скорость вентилятора
+        if service == "set_percentage":
+            number = extract_number(tokens)
+            if not number:
+                return None
+            return {"entity_id": entity_id, "percentage": number}
+
+        # Уровень вентилятора увлажнителя
+        if service == "select_option":
+            level = extract_preset_mode(tokens, "select")
+            if not level:
+                return None
+            return {"entity_id": entity_id, "option": level}
+
+        # Все остальные команды
+        return {"entity_id": entity_id}
