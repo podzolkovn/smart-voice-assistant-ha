@@ -179,22 +179,12 @@ async def _speak(hass: HomeAssistant, text: str) -> None:
             domain="tts",
             service="speak",
             service_data={
+                "media_player_entity_id": SPEAKER_ENTITY,
                 "message": text,
                 "cache": False,
             },
             target={
                 "entity_id": TTS_SERVICE,
-            },
-        )
-        # Даём TTS время подготовить аудио, затем воспроизводим
-        await hass.services.async_call(
-            domain="media_player",
-            service="play_media",
-            service_data={
-                "entity_id": SPEAKER_ENTITY,
-                "media_content_id": f"media-source://tts/{TTS_SERVICE}?message={text}",
-                "media_content_type": "music",
-                "announce": True,
             },
         )
     except Exception as e:
