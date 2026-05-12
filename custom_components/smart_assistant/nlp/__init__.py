@@ -8,6 +8,8 @@ from .action_matcher import (
     extract_state_query,
     extract_number,
     extract_preset_mode,
+    extract_light_params,
+    extract_media_info,
 )
 
 __all__ = [
@@ -22,5 +24,6 @@ __all__ = [
     "extract_state_query",
     "extract_number",
     "extract_preset_mode",
+    "extract_light_params",
     "extract_media_info",
 ]
