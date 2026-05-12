@@ -20,13 +20,14 @@ from .nlp import (
 
 _LOGGER = logging.getLogger(__name__)
 
-# Entity ID динамика на Raspberry Pi — не зарегистрирован в Music Assistant,
-# поэтому управляется напрямую через media_player, а не music_assistant.play_media
+# Нативный entity Pi динамика (Wyoming/Linux Voice Assistant).
+# НЕ media_player.pi_assistant_media_player_2 — это Music Assistant обёртка.
 PI_ENTITY_ID = "media_player.pi_assistant_media_player"
 
-# Entity ID Яндекс станции — интеграция AlexxIT/YandexStation управляется
-# через media_player.play_media с media_content_type: command, а не media_pause/stop
-YANDEX_ENTITY_ID = "media_player.iandeks_lait"
+# Нативный entity Яндекс станции от интеграции AlexxIT/YandexStation.
+# НЕ media_player.iandeks_lait — это Music Assistant обёртка поверх станции.
+# Команды отправляются через play_media с media_content_type: command.
+YANDEX_ENTITY_ID = "media_player.yandex_station_l00sbr700pytvb"
 
 
 class SmartAssistant(AbstractConversationAgent):
@@ -223,14 +224,14 @@ class SmartAssistant(AbstractConversationAgent):
         entity_id = YANDEX_ENTITY_ID
 
         DEVICE_KEYWORDS = {
-            "пи":       PI_ENTITY_ID,
-            "динамик":  PI_ENTITY_ID,
+            "пи":        PI_ENTITY_ID,
+            "динамик":   PI_ENTITY_ID,
             "телевизор": "media_player.sony_kd_55x81j_6",
-            "телек":    "media_player.sony_kd_55x81j_6",
-            "яндекс":   YANDEX_ENTITY_ID,
-            "алиса":    YANDEX_ENTITY_ID,
-            "станция":  YANDEX_ENTITY_ID,
-            "колонка":  YANDEX_ENTITY_ID,
+            "телек":     "media_player.sony_kd_55x81j_6",
+            "яндекс":    YANDEX_ENTITY_ID,
+            "алиса":     YANDEX_ENTITY_ID,
+            "станция":   YANDEX_ENTITY_ID,
+            "колонка":   YANDEX_ENTITY_ID,
         }
         for keyword, eid in DEVICE_KEYWORDS.items():
             if keyword in tokens:
