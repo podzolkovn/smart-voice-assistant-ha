@@ -13,19 +13,18 @@ from .dictionaries import (
     SPLITTERS,
     STATE_STOP_WORDS,
     MEDIA_KEYWORDS,
+    MEDIA_STOP_KEYWORDS,
     MEDIA_TYPES,
     YANDEX_SPECIAL,
     MEDIA_STOP_WORDS,
 )
-MEDIA_STOP_KEYWORDS = {"замолчи", "останови", "хватит", "стоп", "пауза"}
 
 def detect_command_type(tokens: list[str]) -> str:
     has_state_query = any(t in STATE_QUERY_KEYWORDS for t in tokens)
-    has_action = any(t in BASE_SYNONYMS for t in tokens)
     has_media = any(t in MEDIA_KEYWORDS for t in tokens)
     has_media_stop = any(t in MEDIA_STOP_KEYWORDS for t in tokens)
 
-    if has_state_query and not has_action:
+    if has_state_query:
         return "state_query"
     if has_media or has_media_stop:
         return "music"

@@ -227,8 +227,8 @@ class SmartAssistant(AbstractConversationAgent):
         state = self.hass.states.get(entity_id)
         player_name = state.attributes.get("friendly_name", entity_id) if state else entity_id
 
-        STOP_TOKENS = {"замолчи", "останови", "хватит", "стоп", "пауза"}
-        if any(t in STOP_TOKENS for t in tokens):
+        from .nlp.dictionaries.media import MEDIA_STOP_KEYWORDS
+        if any(t in MEDIA_STOP_KEYWORDS for t in tokens):
             try:
                 await self.hass.services.async_call(
                     domain="media_player",
