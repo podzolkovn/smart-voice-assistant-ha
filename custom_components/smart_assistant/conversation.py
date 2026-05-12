@@ -57,7 +57,9 @@ class SmartAssistant(AbstractConversationAgent):
                 result = await self._handle_state_query(tokens, device_index)
                 executed.append(result)
             elif cmd_type == "music":
-                result = await self._handle_music(tokens, device_index)
+                # Передаём оригинальный текст (до лемматизации) — нужен для
+                # формирования команды Алисе в человекочитаемом виде
+                result = await self._handle_music(tokens, device_index, original_text=part)
                 executed.append(result)
             else:
                 result = await self._handle_device(tokens, action_index, device_index, part)
@@ -211,7 +213,7 @@ class SmartAssistant(AbstractConversationAgent):
 
         return {"entity_id": entity_id}
 
-    async def _handle_music(self, tokens: list[str], device_index: dict) -> str | None:
+    async def _handle_music(self, tokens: list[str], device_index: dict, original_text: str = "") -> str | None:
         """Обработка музыкальных команд через Music Assistant"""
         from .nlp.action_matcher import extract_media_info
 
@@ -282,11 +284,17 @@ class SmartAssistant(AbstractConversationAgent):
         # Music Assistant. Команда отправляется напрямую Алисе через play_media
         # с media_content_type: command — Алиса сама ищет и включает музыку.
         if entity_id == YANDEX_ENTITY_ID:
-            # Восстанавливаем оригинальную фразу из токенов для передачи Алисе,
-            # убирая только служебные слова выбора устройства.
-            YANDEX_DEVICE_WORDS = {"яндекс", "алиса", "станция", "колонка"}
-            command_tokens = [t for t in tokens if t not in YANDEX_DEVICE_WORDS]
-            alice_command = " ".join(command_tokens)
+            # Используем оригинальный текст (до лемматизации), иначе Алиса
+            # получит сломанную речь типа "включить мой волна".
+            # Убираем только слова выбора устройства.
+            YANDEX_DEVICE_PHRASES = {
+                "на яндексе", "на станции", "на колонке", "на алисе",
+                "яндекс", "станция", "колонка", "алиса",
+            }
+            alice_command = original_text.strip()
+            for phrase in YANDEX_DEVICE_PHRASES:
+                alice_command = alice_command.replace(phrase, "").strip()
+            alice_command = " ".join(alice_command.split())  # убираем двойные пробелы
             try:
                 await self.hass.services.async_call(
                     domain="media_player",
