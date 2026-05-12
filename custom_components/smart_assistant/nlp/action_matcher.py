@@ -17,6 +17,7 @@ from .dictionaries import (
     MEDIA_TYPES,
     YANDEX_SPECIAL,
     MEDIA_STOP_WORDS,
+    QUERY_KEYWORDS,
 )
 
 # Ключевые слова управления громкостью — роутятся в _handle_music
@@ -31,10 +32,14 @@ VOLUME_KEYWORDS = {
 
 def detect_command_type(tokens: list[str]) -> str:
     has_state_query = any(t in STATE_QUERY_KEYWORDS for t in tokens)
-    has_media = any(t in MEDIA_KEYWORDS for t in tokens)
-    has_media_stop = any(t in MEDIA_STOP_KEYWORDS for t in tokens)
-    has_volume = any(t in VOLUME_KEYWORDS for t in tokens)
+    has_media       = any(t in MEDIA_KEYWORDS for t in tokens)
+    has_media_stop  = any(t in MEDIA_STOP_KEYWORDS for t in tokens)
+    has_volume      = any(t in VOLUME_KEYWORDS for t in tokens)
+    has_query       = any(t in QUERY_KEYWORDS for t in tokens)
 
+    # query приоритетнее state_query — отвечает на "какая погода", "какое время"
+    if has_query:
+        return "query"
     if has_state_query:
         return "state_query"
     if has_media or has_media_stop or has_volume:

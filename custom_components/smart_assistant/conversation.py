@@ -17,6 +17,7 @@ from .nlp import (
     extract_preset_mode,
     extract_media_info,
 )
+from .query_handler import handle_query
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,6 +70,8 @@ class SmartAssistant(AbstractConversationAgent):
 
             if cmd_type == "state_query":
                 result = await self._handle_state_query(tokens, device_index)
+            elif cmd_type == "query":
+                result = await handle_query(self.hass, tokens, part)
             elif cmd_type == "music":
                 result = await self._handle_music(tokens, device_index, original_text=part)
             else:
