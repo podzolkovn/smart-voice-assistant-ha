@@ -209,25 +209,25 @@ class SmartAssistant(AbstractConversationAgent):
 
         media_info = extract_media_info(tokens)
 
-        # Ищем устройство из команды — ищем среди ВСЕХ media_player
-        media_index = {k: v for k, v in device_index.items() if v.startswith("media_player.")}
-        entity_id = find_device(" ".join(tokens), media_index)
+        # По умолчанию — Яндекс Лайт
+        entity_id = "media_player.yandex_station_l00sbr700pytvb"
 
-        # Проверяем что нашли правильное устройство
-        if entity_id and entity_id == "media_player.pi_assistant_media_player":
-            # Если нашли Pi — проверяем что в команде явно упоминается Pi
-            pi_keywords = {"пи", "динамик", "колонка пи", "локальный"}
-            if not any(kw in tokens for kw in pi_keywords):
-                entity_id = None
-
-        if not entity_id:
-            # По умолчанию — Pi Assistant динамик
-            entity_id = "media_player.pi_assistant_media_player"
+        # Если явно указано другое устройство
+        DEVICE_KEYWORDS = {
+            "пи": "media_player.pi_assistant_media_player",
+            "динамик": "media_player.pi_assistant_media_player",
+            "телевизор": "media_player.sony_kd_55x81j_6",
+            "телек": "media_player.sony_kd_55x81j_6",
+        }
+        for keyword, eid in DEVICE_KEYWORDS.items():
+            if keyword in tokens:
+                entity_id = eid
+                break
 
         state = self.hass.states.get(entity_id)
         player_name = state.attributes.get("friendly_name", entity_id) if state else entity_id
 
-        # Если нет названия — просто play/pause
+        # Если нет названия — просто play
         if not media_info.get("media_id"):
             try:
                 await self.hass.services.async_call(
