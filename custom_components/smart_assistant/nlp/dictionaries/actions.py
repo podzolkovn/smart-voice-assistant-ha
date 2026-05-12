@@ -46,9 +46,11 @@ BASE_SYNONYMS = {
     "воспроизвести": "ma_play",
     "поставить":     "ma_play",
     "стоп":       "media_stop",
-    "пауза":      "media_pause",
-    "останови":   "media_pause",
-    "замолчи":    "media_pause",
+    "замолчи":   "media_pause",
+    "останови":  "media_pause",
+    "хватит":    "media_pause",
+    "тихо":      "media_pause",
+
 }
 
 AUTO_TRANSLATE = {

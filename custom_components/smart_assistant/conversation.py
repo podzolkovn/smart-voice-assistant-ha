@@ -227,6 +227,19 @@ class SmartAssistant(AbstractConversationAgent):
         state = self.hass.states.get(entity_id)
         player_name = state.attributes.get("friendly_name", entity_id) if state else entity_id
 
+        STOP_TOKENS = {"замолчи", "останови", "хватит", "стоп", "пауза"}
+        if any(t in STOP_TOKENS for t in tokens):
+            try:
+                await self.hass.services.async_call(
+                    domain="media_player",
+                    service="media_pause",
+                    service_data={"entity_id": entity_id}
+                )
+                return f"Останавливаю на {player_name}"
+            except Exception as e:
+                _LOGGER.error("Ошибка стоп: %s", e)
+                return None
+
         # Если нет названия — просто play
         if not media_info.get("media_id"):
             try:
