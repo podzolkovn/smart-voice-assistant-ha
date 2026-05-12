@@ -17,8 +17,16 @@ from .dictionaries import (
     MEDIA_TYPES,
     YANDEX_SPECIAL,
     MEDIA_STOP_WORDS,
-VOLUME_KEYWORDS,
 )
+
+# Ключевые слова управления громкостью — роутятся в _handle_music
+VOLUME_KEYWORDS = {
+    "громкость",    # громкость → громкость
+    "громкий",      # громче/погромче → громкий
+    "тихий",        # тише/потише → тихий
+    "прибавить",    # прибавь → прибавить
+    "убавить",      # убавь → убавить
+}
 
 
 def detect_command_type(tokens: list[str]) -> str:
