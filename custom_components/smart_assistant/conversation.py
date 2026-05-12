@@ -209,19 +209,20 @@ class SmartAssistant(AbstractConversationAgent):
 
         media_info = extract_media_info(tokens)
 
-        # Ищем устройство из команды
-        entity_id = find_device(" ".join(tokens), device_index, "ma_play")
+        # Ищем устройство из команды — ищем среди ВСЕХ media_player
+        media_index = {k: v for k, v in device_index.items() if v.startswith("media_player.")}
+        entity_id = find_device(" ".join(tokens), media_index)
 
-        # Проверяем что найденное устройство — media_player
-        if entity_id and not entity_id.startswith("media_player."):
-            entity_id = None
+        # Проверяем что нашли правильное устройство
+        if entity_id and entity_id == "media_player.pi_assistant_media_player":
+            # Если нашли Pi — проверяем что в команде явно упоминается Pi
+            pi_keywords = {"пи", "динамик", "колонка пи", "локальный"}
+            if not any(kw in tokens for kw in pi_keywords):
+                entity_id = None
 
         if not entity_id:
             # По умолчанию — Pi Assistant динамик
-            entity_id = "media_player.pi_assistant_media_player_2"
-
-        if not entity_id:
-            return None
+            entity_id = "media_player.pi_assistant_media_player"
 
         state = self.hass.states.get(entity_id)
         player_name = state.attributes.get("friendly_name", entity_id) if state else entity_id
