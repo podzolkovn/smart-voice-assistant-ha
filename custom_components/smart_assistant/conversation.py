@@ -40,8 +40,21 @@ class SmartAssistant(AbstractConversationAgent):
         return ["ru"]
 
     async def async_process(self, user_input: ConversationInput) -> ConversationResult:
-        text = user_input.text.lower()
+        import re
+        # Убираем знаки препинания — иначе wake word "эй, джарвис!" ломает токенизацию
+        text = re.sub(r"[^\w\s]", " ", user_input.text.lower()).strip()
         _LOGGER.debug("Команда: %s", text)
+
+        # Пустая команда или только wake word — тихо игнорируем
+        WAKE_WORDS = {"эй", "джарвис", "jarvis", "hey"}
+        tokens_check = text.split()
+        if not tokens_check or all(t in WAKE_WORDS for t in tokens_check):
+            intent_response = intent.IntentResponse(language=user_input.language)
+            intent_response.async_set_speech("")
+            return ConversationResult(
+                response=intent_response,
+                conversation_id=user_input.conversation_id
+            )
 
         device_index = build_search_index(self.hass)
         action_index = build_action_index(self.hass)
@@ -56,22 +69,24 @@ class SmartAssistant(AbstractConversationAgent):
 
             if cmd_type == "state_query":
                 result = await self._handle_state_query(tokens, device_index)
-                executed.append(result)
             elif cmd_type == "music":
-                # Передаём оригинальный текст (до лемматизации) — нужен для
-                # формирования команды Алисе в человекочитаемом виде
                 result = await self._handle_music(tokens, device_index, original_text=part)
-                executed.append(result)
             else:
                 result = await self._handle_device(tokens, action_index, device_index, part)
+
+            if result is not None:
                 executed.append(result)
+            else:
+                failed.append(part)
 
         if executed and not failed:
             response_text = "Готово! " + ", ".join(executed)
         elif executed and failed:
-            response_text = f"Выполнено: {', '.join(executed)}. Не удалось: {', '.join(failed)}"
+            response_text = f"Выполнено: {', '.join(executed)}. Не удалось: {len(failed)} команд"
+        elif failed and not executed:
+            response_text = "Не понял команду"
         else:
-            response_text = "Не удалось: " + ", ".join(failed)
+            response_text = "Готово"
 
         intent_response = intent.IntentResponse(language=user_input.language)
         intent_response.async_set_speech(response_text)
@@ -217,8 +232,8 @@ class SmartAssistant(AbstractConversationAgent):
     async def _handle_volume(self, tokens: list[str], entity_id: str, player_name: str, volume_levels: dict) -> str | None:
         """Установка громкости: число 0-100, процент, или именованный уровень"""
 
-        UP_WORDS   = {"громче", "погромче", "прибавить", "прибавь", "volume_up"}
-        DOWN_WORDS = {"тише", "потише", "убавить", "убавь", "volume_down"}
+        UP_WORDS   = {"громкий", "прибавить", "volume_up"}   # громче/погромче → громкий
+        DOWN_WORDS = {"тихий", "убавить", "volume_down"}      # тише/потише → тихий
 
         # Громче / тише — шаг 10%
         if any(t in UP_WORDS for t in tokens):
@@ -309,10 +324,13 @@ class SmartAssistant(AbstractConversationAgent):
         player_name = state.attributes.get("friendly_name", entity_id) if state else entity_id
 
         from .nlp.dictionaries.media import MEDIA_STOP_KEYWORDS
-        from .nlp.dictionaries.actions import VOLUME_LEVELS, VOLUME_KEYWORDS
+        from .nlp.dictionaries.actions import VOLUME_LEVELS
 
         # Громкость: "громкость 70", "громкость 70%", "максимальная громкость", "громче", "тише"
-
+        # Используем нормальные формы после pymorphy3:
+        # громче/погромче → громкий, тише/потише → тихий, прибавь → прибавить, убавь → убавить
+        VOLUME_KEYWORDS = {"громкость", "громкий", "тихий", "прибавить", "убавить",
+                           "volume_set", "volume_up", "volume_down"}
         if any(t in VOLUME_KEYWORDS for t in tokens):
             return await self._handle_volume(tokens, entity_id, player_name, VOLUME_LEVELS)
 

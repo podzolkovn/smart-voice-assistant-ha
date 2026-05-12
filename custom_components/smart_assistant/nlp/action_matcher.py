@@ -17,9 +17,9 @@ from .dictionaries import (
     MEDIA_TYPES,
     YANDEX_SPECIAL,
     MEDIA_STOP_WORDS,
-    VOLUME_KEYWORDS,
-    VOLUME_LEVELS,
+VOLUME_KEYWORDS,
 )
+
 
 def detect_command_type(tokens: list[str]) -> str:
     has_state_query = any(t in STATE_QUERY_KEYWORDS for t in tokens)
