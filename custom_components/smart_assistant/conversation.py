@@ -20,6 +20,14 @@ from .nlp import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Entity ID динамика на Raspberry Pi — не зарегистрирован в Music Assistant,
+# поэтому управляется напрямую через media_player, а не music_assistant.play_media
+PI_ENTITY_ID = "media_player.pi_assistant_media_player"
+
+# Entity ID Яндекс станции — интеграция AlexxIT/YandexStation управляется
+# через media_player.play_media с media_content_type: command, а не media_pause/stop
+YANDEX_ENTITY_ID = "media_player.iandeks_lait"
+
 
 class SmartAssistant(AbstractConversationAgent):
 
@@ -210,17 +218,17 @@ class SmartAssistant(AbstractConversationAgent):
         media_info = extract_media_info(tokens)
 
         # По умолчанию — Яндекс Лайт
-        entity_id = "media_player.iandeks_lait"
+        entity_id = YANDEX_ENTITY_ID
 
         DEVICE_KEYWORDS = {
-            "пи": "media_player.pi_assistant_media_player",
-            "динамик": "media_player.pi_assistant_media_player",
+            "пи":       PI_ENTITY_ID,
+            "динамик":  PI_ENTITY_ID,
             "телевизор": "media_player.sony_kd_55x81j_6",
-            "телек": "media_player.sony_kd_55x81j_6",
-            "яндекс": "media_player.iandeks_lait",
-            "алиса": "media_player.iandeks_lait",
-            "станция": "media_player.iandeks_lait",
-            "колонка": "media_player.iandeks_lait",
+            "телек":    "media_player.sony_kd_55x81j_6",
+            "яндекс":   YANDEX_ENTITY_ID,
+            "алиса":    YANDEX_ENTITY_ID,
+            "станция":  YANDEX_ENTITY_ID,
+            "колонка":  YANDEX_ENTITY_ID,
         }
         for keyword, eid in DEVICE_KEYWORDS.items():
             if keyword in tokens:
@@ -233,17 +241,31 @@ class SmartAssistant(AbstractConversationAgent):
         from .nlp.dictionaries.media import MEDIA_STOP_KEYWORDS
         if any(t in MEDIA_STOP_KEYWORDS for t in tokens):
             try:
-                await self.hass.services.async_call(
-                    domain="media_player",
-                    service="media_pause",
-                    service_data={"entity_id": entity_id}
-                )
+                if entity_id == YANDEX_ENTITY_ID:
+                    # FIX: AlexxIT/YandexStation не реагирует на media_pause/media_stop.
+                    # Команды отправляются через play_media с media_content_type: command.
+                    await self.hass.services.async_call(
+                        domain="media_player",
+                        service="play_media",
+                        service_data={
+                            "entity_id": entity_id,
+                            "media_content_id": "стоп",
+                            "media_content_type": "command",
+                        }
+                    )
+                else:
+                    await self.hass.services.async_call(
+                        domain="media_player",
+                        service="media_pause",
+                        service_data={"entity_id": entity_id}
+                    )
+                _LOGGER.info("Стоп музыки: %s", entity_id)
                 return f"Останавливаю на {player_name}"
             except Exception as e:
                 _LOGGER.error("Ошибка стоп: %s", e)
                 return None
 
-        # Если нет названия — просто play
+        # Если нет названия — просто play (resume)
         if not media_info.get("media_id"):
             try:
                 await self.hass.services.async_call(
@@ -256,7 +278,51 @@ class SmartAssistant(AbstractConversationAgent):
                 _LOGGER.error("Ошибка: %s", e)
                 return None
 
-        # Воспроизвести через Music Assistant
+        # FIX: Яндекс станция (AlexxIT/YandexStation) не управляется через
+        # Music Assistant. Команда отправляется напрямую Алисе через play_media
+        # с media_content_type: command — Алиса сама ищет и включает музыку.
+        if entity_id == YANDEX_ENTITY_ID:
+            # Восстанавливаем оригинальную фразу из токенов для передачи Алисе,
+            # убирая только служебные слова выбора устройства.
+            YANDEX_DEVICE_WORDS = {"яндекс", "алиса", "станция", "колонка"}
+            command_tokens = [t for t in tokens if t not in YANDEX_DEVICE_WORDS]
+            alice_command = " ".join(command_tokens)
+            try:
+                await self.hass.services.async_call(
+                    domain="media_player",
+                    service="play_media",
+                    service_data={
+                        "entity_id": entity_id,
+                        "media_content_id": alice_command,
+                        "media_content_type": "command",
+                    }
+                )
+                _LOGGER.info("Яндекс команда: '%s' → %s", alice_command, entity_id)
+                return f"Включаю {media_info.get('media_id') or alice_command} на {player_name}"
+            except Exception as e:
+                _LOGGER.error("Ошибка Яндекс команды: %s", e)
+                return None
+
+        # FIX: Pi динамик не зарегистрирован в Music Assistant —
+        # используем стандартный media_player.play_media напрямую.
+        if entity_id == PI_ENTITY_ID:
+            try:
+                await self.hass.services.async_call(
+                    domain="media_player",
+                    service="play_media",
+                    service_data={
+                        "entity_id": entity_id,
+                        "media_content_id": media_info["media_id"],
+                        "media_content_type": media_info.get("media_type") or "music",
+                    }
+                )
+                _LOGGER.info("Pi музыка: %s на %s", media_info["media_id"], entity_id)
+                return f"Включаю {media_info['media_id']} на {player_name}"
+            except Exception as e:
+                _LOGGER.error("Ошибка Pi музыка: %s", e)
+                return None
+
+        # Воспроизвести через Music Assistant (другие MA-плееры)
         try:
             service_data = {
                 "entity_id": entity_id,
@@ -271,7 +337,7 @@ class SmartAssistant(AbstractConversationAgent):
                 service="play_media",
                 service_data=service_data
             )
-            _LOGGER.info("Музыка: %s на %s", media_info["media_id"], entity_id)
+            _LOGGER.info("MA музыка: %s на %s", media_info["media_id"], entity_id)
             return f"Включаю {media_info['media_id']} на {player_name}"
 
         except Exception as e:
