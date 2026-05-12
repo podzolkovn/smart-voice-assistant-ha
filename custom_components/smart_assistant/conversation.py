@@ -209,14 +209,16 @@ class SmartAssistant(AbstractConversationAgent):
 
         media_info = extract_media_info(tokens)
 
-        # Ищем устройство
+        # Ищем устройство из команды
         entity_id = find_device(" ".join(tokens), device_index, "ma_play")
+
+        # Проверяем что найденное устройство — media_player
+        if entity_id and not entity_id.startswith("media_player."):
+            entity_id = None
+
         if not entity_id:
-            # По умолчанию — Яндекс Лайт
-            for eid in self.hass.states.async_entity_ids("media_player"):
-                if "yandex" in eid.lower() or "iandeks" in eid.lower():
-                    entity_id = eid
-                    break
+            # По умолчанию — Pi Assistant динамик
+            entity_id = "media_player.pi_assistant_media_player_2"
 
         if not entity_id:
             return None
