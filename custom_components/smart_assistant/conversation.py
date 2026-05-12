@@ -210,14 +210,17 @@ class SmartAssistant(AbstractConversationAgent):
         media_info = extract_media_info(tokens)
 
         # По умолчанию — Яндекс Лайт
-        entity_id = "media_player.yandex_station_l00sbr700pytvb"
+        entity_id = "media_player.iandeks_lait"
 
-        # Если явно указано другое устройство
         DEVICE_KEYWORDS = {
             "пи": "media_player.pi_assistant_media_player",
             "динамик": "media_player.pi_assistant_media_player",
             "телевизор": "media_player.sony_kd_55x81j_6",
             "телек": "media_player.sony_kd_55x81j_6",
+            "яндекс": "media_player.iandeks_lait",
+            "алиса": "media_player.iandeks_lait",
+            "станция": "media_player.iandeks_lait",
+            "колонка": "media_player.iandeks_lait",
         }
         for keyword, eid in DEVICE_KEYWORDS.items():
             if keyword in tokens:
