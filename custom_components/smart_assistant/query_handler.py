@@ -1,6 +1,6 @@
 from __future__ import annotations
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from homeassistant.core import HomeAssistant
 
@@ -149,14 +149,12 @@ def _home(hass: HomeAssistant, tokens: list[str]) -> str:
     return ", ".join(parts) if parts else "Данные недоступны"
 
 
-async def _timer(hass: HomeAssistant, tokens: list[str], original_text: str) -> str:
-    """Таймер через автоматизацию HA."""
-async def _timer(hass: HomeAssistant, tokens: list[str], original_text: str) -> str:
-    """Таймер через HA timer entity."""
+async def _timer(hass: HomeAssistant, tokens: list[str], original_text: str) -> str | None:
+    """Таймер: отмена — наша, запуск — HA Default Agent."""
 
     CANCEL_WORDS = {"остановить", "отменить", "выключить", "сбросить", "стоп"}
 
-    # Отмена таймера
+    # Отмена таймера — обрабатываем сами
     if any(t in CANCEL_WORDS for t in tokens):
         try:
             await hass.services.async_call(
@@ -169,52 +167,9 @@ async def _timer(hass: HomeAssistant, tokens: list[str], original_text: str) -> 
             _LOGGER.error("Ошибка отмены таймера: %s", e)
             return "Не удалось отменить таймер"
 
-    minutes = _extract_duration(tokens, "минута")
-    seconds = _extract_duration(tokens, "секунда")
-    hours   = _extract_duration(tokens, "час")
-
-    total_seconds = (hours * 3600) + (minutes * 60) + seconds
-
-    if total_seconds <= 0:
-        return "Не понял на сколько поставить таймер"
-
-    try:
-        await hass.services.async_call(
-            domain="timer",
-            service="start",
-            service_data={
-                "duration": str(timedelta(seconds=total_seconds)),
-            },
-            target={"entity_id": "timer.assistant_timer"},
-        )
-    except Exception:
-        _LOGGER.warning("timer.assistant_timer не найден, создайте его в HA")
-        return "Таймер не настроен. Создайте timer.assistant_timer в Home Assistant"
-
-    # Формируем ответ
-    parts = []
-    if hours:   parts.append(f"{hours} {'час' if hours == 1 else 'часа' if hours < 5 else 'часов'}")
-    if minutes: parts.append(f"{minutes} {'минуту' if minutes == 1 else 'минуты' if minutes < 5 else 'минут'}")
-    if seconds: parts.append(f"{seconds} {'секунду' if seconds == 1 else 'секунды' if seconds < 5 else 'секунд'}")
-
-    return f"Таймер на {' '.join(parts)} запущен"
-
-
-def _extract_duration(tokens: list[str], unit: str) -> int:
-    """Извлекаем число перед единицей времени."""
-    for i, token in enumerate(tokens):
-        if token == unit and i > 0:
-            prev = tokens[i - 1]
-            clean = prev.rstrip("%")
-            if clean.isdigit():
-                return int(clean)
-    # Если единица есть но числа нет рядом — ищем любое число
-    if unit in tokens:
-        for token in tokens:
-            clean = token.rstrip("%")
-            if clean.isdigit():
-                return int(clean)
-    return 0
+    # Запуск таймера — возвращаем None, чтобы команда упала на HA Default Agent.
+    # Он умеет обрабатывать и цифры и прописные числа ("одну минуту", "пять минут").
+    return None
 
 
 async def _speak(hass: HomeAssistant, text: str) -> None:
