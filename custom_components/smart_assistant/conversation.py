@@ -214,6 +214,73 @@ class SmartAssistant(AbstractConversationAgent):
 
         return {"entity_id": entity_id}
 
+    async def _handle_volume(self, tokens: list[str], entity_id: str, player_name: str, volume_levels: dict) -> str | None:
+        """Установка громкости: число 0-100, процент, или именованный уровень"""
+
+        UP_WORDS   = {"громче", "погромче", "прибавить", "прибавь", "volume_up"}
+        DOWN_WORDS = {"тише", "потише", "убавить", "убавь", "volume_down"}
+
+        # Громче / тише — шаг 10%
+        if any(t in UP_WORDS for t in tokens):
+            try:
+                await self.hass.services.async_call(
+                    domain="media_player",
+                    service="volume_up",
+                    service_data={"entity_id": entity_id}
+                )
+                return f"Громче на {player_name}"
+            except Exception as e:
+                _LOGGER.error("Ошибка volume_up: %s", e)
+                return None
+
+        if any(t in DOWN_WORDS for t in tokens):
+            try:
+                await self.hass.services.async_call(
+                    domain="media_player",
+                    service="volume_down",
+                    service_data={"entity_id": entity_id}
+                )
+                return f"Тише на {player_name}"
+            except Exception as e:
+                _LOGGER.error("Ошибка volume_down: %s", e)
+                return None
+
+        # Именованный уровень: "максимальная", "минимальная", "средняя" и т.д.
+        for token in tokens:
+            if token in volume_levels:
+                level = volume_levels[token]
+                try:
+                    await self.hass.services.async_call(
+                        domain="media_player",
+                        service="volume_set",
+                        service_data={"entity_id": entity_id, "volume_level": level}
+                    )
+                    pct = int(level * 100)
+                    return f"Громкость {pct}% на {player_name}"
+                except Exception as e:
+                    _LOGGER.error("Ошибка volume_set: %s", e)
+                    return None
+
+        # Число: "громкость 70" или "70%"
+        for token in tokens:
+            clean = token.rstrip("%")
+            if clean.isdigit():
+                number = int(clean)
+                if 0 <= number <= 100:
+                    level = round(number / 100, 2)
+                    try:
+                        await self.hass.services.async_call(
+                            domain="media_player",
+                            service="volume_set",
+                            service_data={"entity_id": entity_id, "volume_level": level}
+                        )
+                        return f"Громкость {number}% на {player_name}"
+                    except Exception as e:
+                        _LOGGER.error("Ошибка volume_set: %s", e)
+                        return None
+
+        return None
+
     async def _handle_music(self, tokens: list[str], device_index: dict, original_text: str = "") -> str | None:
         """Обработка музыкальных команд через Music Assistant"""
         from .nlp.action_matcher import extract_media_info
@@ -242,6 +309,13 @@ class SmartAssistant(AbstractConversationAgent):
         player_name = state.attributes.get("friendly_name", entity_id) if state else entity_id
 
         from .nlp.dictionaries.media import MEDIA_STOP_KEYWORDS
+        from .nlp.dictionaries.actions import VOLUME_LEVELS, VOLUME_KEYWORDS
+
+        # Громкость: "громкость 70", "громкость 70%", "максимальная громкость", "громче", "тише"
+
+        if any(t in VOLUME_KEYWORDS for t in tokens):
+            return await self._handle_volume(tokens, entity_id, player_name, VOLUME_LEVELS)
+
         if any(t in MEDIA_STOP_KEYWORDS for t in tokens):
             try:
                 if entity_id == YANDEX_ENTITY_ID:

@@ -17,16 +17,19 @@ from .dictionaries import (
     MEDIA_TYPES,
     YANDEX_SPECIAL,
     MEDIA_STOP_WORDS,
+    VOLUME_KEYWORDS,
+    VOLUME_LEVELS,
 )
 
 def detect_command_type(tokens: list[str]) -> str:
     has_state_query = any(t in STATE_QUERY_KEYWORDS for t in tokens)
     has_media = any(t in MEDIA_KEYWORDS for t in tokens)
     has_media_stop = any(t in MEDIA_STOP_KEYWORDS for t in tokens)
+    has_volume = any(t in VOLUME_KEYWORDS for t in tokens)
 
     if has_state_query:
         return "state_query"
-    if has_media or has_media_stop:
+    if has_media or has_media_stop or has_volume:
         return "music"
     return "device"
 
@@ -38,8 +41,9 @@ def extract_state_query(tokens: list[str]) -> str | None:
 
 def extract_number(tokens: list[str]) -> int | None:
     for token in tokens:
-        if token.isdigit():
-            return int(token)
+        clean = token.rstrip("%")
+        if clean.isdigit():
+            return int(clean)
     return None
 
 
@@ -63,37 +67,33 @@ def extract_light_params(tokens: list[str]) -> dict:
     """Извлекаем параметры лампы из токенов"""
     params = {}
 
-    # Ищем RGB цвет
     for token in tokens:
         if token in LIGHT_COLORS:
             r, g, b = LIGHT_COLORS[token]
             params["hs_color"] = _rgb_to_hs(r, g, b)
             return params
 
-    # Ищем температуру цвета
     for token in tokens:
         if token in LIGHT_COLOR_TEMP:
             params["color_temp_kelvin"] = LIGHT_COLOR_TEMP[token]
             return params
 
-    # Ищем эффект
     for token in tokens:
         if token in LIGHT_EFFECTS:
             params["effect"] = LIGHT_EFFECTS[token]
             return params
 
-    # Ищем яркость по слову
     for token in tokens:
         if token in LIGHT_BRIGHTNESS:
             params["brightness"] = LIGHT_BRIGHTNESS[token]
             return params
 
-    # Ищем яркость по числу (1-100%)
     number = extract_number(tokens)
     if number:
         params["brightness"] = int(number * 2.55)
 
     return params
+
 
 def extract_media_info(tokens: list[str]) -> dict:
     """Извлекаем информацию о медиа из токенов"""
@@ -102,7 +102,6 @@ def extract_media_info(tokens: list[str]) -> dict:
         "media_type": None,
     }
 
-    # Проверяем специальные плейлисты Яндекс
     text = " ".join(tokens)
     for key, value in YANDEX_SPECIAL.items():
         if key in text:
@@ -110,13 +109,11 @@ def extract_media_info(tokens: list[str]) -> dict:
             result["media_type"] = "playlist"
             return result
 
-    # Определяем тип медиа
     for token in tokens:
         if token in MEDIA_TYPES:
             result["media_type"] = MEDIA_TYPES[token]
             break
 
-    # Извлекаем название
     title_tokens = [t for t in tokens if t not in MEDIA_STOP_WORDS and len(t) > 1]
     if title_tokens:
         result["media_id"] = " ".join(title_tokens)

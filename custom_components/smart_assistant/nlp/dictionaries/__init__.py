@@ -1,4 +1,4 @@
-from .actions import BASE_SYNONYMS, AUTO_TRANSLATE
+from .actions import BASE_SYNONYMS, AUTO_TRANSLATE, VOLUME_LEVELS, VOLUME_KEYWORDS
 from .modes import (
     PURIFIER_MODES,
     HUMIDIFIER_FAN_LEVELS,
@@ -30,4 +30,6 @@ __all__ = [
     "MEDIA_TYPES",
     "YANDEX_SPECIAL",
     "MEDIA_STOP_WORDS",
+    "VOLUME_KEYWORDS",
+    "VOLUME_LEVELS",
 ]
