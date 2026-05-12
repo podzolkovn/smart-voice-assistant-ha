@@ -12,14 +12,22 @@ from .dictionaries import (
     STATE_QUERY_KEYWORDS,
     SPLITTERS,
     STATE_STOP_WORDS,
+    MEDIA_KEYWORDS,
+    MEDIA_TYPES,
+    YANDEX_SPECIAL,
+    MEDIA_STOP_WORDS,
 )
 
 
 def detect_command_type(tokens: list[str]) -> str:
     has_state_query = any(t in STATE_QUERY_KEYWORDS for t in tokens)
     has_action = any(t in BASE_SYNONYMS for t in tokens)
+    has_media = any(t in MEDIA_KEYWORDS for t in tokens)
+
     if has_state_query and not has_action:
         return "state_query"
+    if has_media:
+        return "music"
     return "device"
 
 
@@ -86,6 +94,34 @@ def extract_light_params(tokens: list[str]) -> dict:
         params["brightness"] = int(number * 2.55)
 
     return params
+
+def extract_media_info(tokens: list[str]) -> dict:
+    """Извлекаем информацию о медиа из токенов"""
+    result = {
+        "media_id": None,
+        "media_type": None,
+    }
+
+    # Проверяем специальные плейлисты Яндекс
+    text = " ".join(tokens)
+    for key, value in YANDEX_SPECIAL.items():
+        if key in text:
+            result["media_id"] = value
+            result["media_type"] = "playlist"
+            return result
+
+    # Определяем тип медиа
+    for token in tokens:
+        if token in MEDIA_TYPES:
+            result["media_type"] = MEDIA_TYPES[token]
+            break
+
+    # Извлекаем название
+    title_tokens = [t for t in tokens if t not in MEDIA_STOP_WORDS and len(t) > 1]
+    if title_tokens:
+        result["media_id"] = " ".join(title_tokens)
+
+    return result
 
 
 def _rgb_to_hs(r: int, g: int, b: int) -> tuple[float, float]:

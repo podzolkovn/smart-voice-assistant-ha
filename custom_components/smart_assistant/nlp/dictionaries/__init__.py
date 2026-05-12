@@ -10,6 +10,7 @@ from .modes import (
 )
 from .keywords import STATE_QUERY_KEYWORDS, SPLITTERS
 from .stop_words import STATE_STOP_WORDS
+from .media import MEDIA_KEYWORDS, MEDIA_TYPES, YANDEX_SPECIAL, MEDIA_STOP_WORDS
 
 __all__ = [
     "BASE_SYNONYMS",
@@ -24,4 +25,8 @@ __all__ = [
     "STATE_QUERY_KEYWORDS",
     "SPLITTERS",
     "STATE_STOP_WORDS",
+    "MEDIA_KEYWORDS",
+    "MEDIA_TYPES",
+    "YANDEX_SPECIAL",
+    "MEDIA_STOP_WORDS",
 ]

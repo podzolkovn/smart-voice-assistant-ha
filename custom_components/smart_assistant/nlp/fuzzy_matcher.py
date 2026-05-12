@@ -3,10 +3,9 @@ from homeassistant.core import HomeAssistant
 
 # Домены которые поддерживают медиа команды
 MEDIA_DOMAINS = {
-    "play_media", "media_play", "media_pause",
+    "ma_play", "play_media", "media_play", "media_pause",
     "volume_up", "volume_down", "volume_set"
 }
-
 
 def build_search_index(hass: HomeAssistant) -> dict[str, str]:
     """Строим индекс для поиска устройств"""

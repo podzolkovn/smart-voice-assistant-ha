@@ -40,6 +40,11 @@ BASE_SYNONYMS = {
     # Лампа — эффект
     "эффект":  "light_set_effect",
     "режим":   "light_set_effect",
+
+    "играть":        "ma_play",
+    "сыграть":       "ma_play",
+    "воспроизвести": "ma_play",
+    "поставить":     "ma_play",
 }
 
 AUTO_TRANSLATE = {
@@ -54,4 +59,5 @@ AUTO_TRANSLATE = {
     "light_set_brightness": ["яркость"],
     "light_set_color":      ["цвет", "покрась", "сделай"],
     "light_set_effect":     ["эффект"],
+    "ma_play": ["играть", "сыграть", "воспроизвести", "включить музыку"],
 }

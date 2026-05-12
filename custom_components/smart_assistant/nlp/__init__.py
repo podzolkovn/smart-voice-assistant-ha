@@ -22,4 +22,5 @@ __all__ = [
     "extract_state_query",
     "extract_number",
     "extract_preset_mode",
+    "extract_media_info",
 ]

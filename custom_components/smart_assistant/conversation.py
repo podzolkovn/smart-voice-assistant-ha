@@ -15,6 +15,7 @@ from .nlp import (
     extract_state_query,
     extract_number,
     extract_preset_mode,
+    extract_media_info,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,16 +47,13 @@ class SmartAssistant(AbstractConversationAgent):
 
             if cmd_type == "state_query":
                 result = await self._handle_state_query(tokens, device_index)
-                if result:
-                    executed.append(result)
-                else:
-                    failed.append(f"Не нашёл информацию: '{part}'")
+                executed.append(result)
+            elif cmd_type == "music":
+                result = await self._handle_music(tokens, device_index)
+                executed.append(result)
             else:
                 result = await self._handle_device(tokens, action_index, device_index, part)
-                if result:
-                    executed.append(result)
-                else:
-                    failed.append(f"Не удалось: '{part}'")
+                executed.append(result)
 
         if executed and not failed:
             response_text = "Готово! " + ", ".join(executed)
@@ -204,3 +202,59 @@ class SmartAssistant(AbstractConversationAgent):
             return {"entity_id": entity_id, "option": level}
 
         return {"entity_id": entity_id}
+
+    async def _handle_music(self, tokens: list[str], device_index: dict) -> str | None:
+        """Обработка музыкальных команд через Music Assistant"""
+        from .nlp.action_matcher import extract_media_info
+
+        media_info = extract_media_info(tokens)
+
+        # Ищем устройство
+        entity_id = find_device(" ".join(tokens), device_index, "ma_play")
+        if not entity_id:
+            # По умолчанию — Яндекс Лайт
+            for eid in self.hass.states.async_entity_ids("media_player"):
+                if "yandex" in eid.lower() or "iandeks" in eid.lower():
+                    entity_id = eid
+                    break
+
+        if not entity_id:
+            return None
+
+        state = self.hass.states.get(entity_id)
+        player_name = state.attributes.get("friendly_name", entity_id) if state else entity_id
+
+        # Если нет названия — просто play/pause
+        if not media_info.get("media_id"):
+            try:
+                await self.hass.services.async_call(
+                    domain="media_player",
+                    service="media_play",
+                    service_data={"entity_id": entity_id}
+                )
+                return f"Воспроизвожу на {player_name}"
+            except Exception as e:
+                _LOGGER.error("Ошибка: %s", e)
+                return None
+
+        # Воспроизвести через Music Assistant
+        try:
+            service_data = {
+                "entity_id": entity_id,
+                "media_id": media_info["media_id"],
+                "enqueue": "replace",
+            }
+            if media_info.get("media_type"):
+                service_data["media_type"] = media_info["media_type"]
+
+            await self.hass.services.async_call(
+                domain="music_assistant",
+                service="play_media",
+                service_data=service_data
+            )
+            _LOGGER.info("Музыка: %s на %s", media_info["media_id"], entity_id)
+            return f"Включаю {media_info['media_id']} на {player_name}"
+
+        except Exception as e:
+            _LOGGER.error("Ошибка музыки: %s", e)
+            return None
