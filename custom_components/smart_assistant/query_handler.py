@@ -151,6 +151,24 @@ def _home(hass: HomeAssistant, tokens: list[str]) -> str:
 
 async def _timer(hass: HomeAssistant, tokens: list[str], original_text: str) -> str:
     """Таймер через автоматизацию HA."""
+async def _timer(hass: HomeAssistant, tokens: list[str], original_text: str) -> str:
+    """Таймер через HA timer entity."""
+
+    CANCEL_WORDS = {"остановить", "отменить", "выключить", "сбросить", "стоп"}
+
+    # Отмена таймера
+    if any(t in CANCEL_WORDS for t in tokens):
+        try:
+            await hass.services.async_call(
+                domain="timer",
+                service="cancel",
+                target={"entity_id": "timer.assistant_timer"},
+            )
+            return "Таймер отменён"
+        except Exception as e:
+            _LOGGER.error("Ошибка отмены таймера: %s", e)
+            return "Не удалось отменить таймер"
+
     minutes = _extract_duration(tokens, "минута")
     seconds = _extract_duration(tokens, "секунда")
     hours   = _extract_duration(tokens, "час")
@@ -160,7 +178,6 @@ async def _timer(hass: HomeAssistant, tokens: list[str], original_text: str) -> 
     if total_seconds <= 0:
         return "Не понял на сколько поставить таймер"
 
-    # Используем timer.create если есть, иначе просто уведомление
     try:
         await hass.services.async_call(
             domain="timer",
@@ -171,7 +188,6 @@ async def _timer(hass: HomeAssistant, tokens: list[str], original_text: str) -> 
             target={"entity_id": "timer.assistant_timer"},
         )
     except Exception:
-        # Если timer.assistant_timer не настроен — сообщаем об этом
         _LOGGER.warning("timer.assistant_timer не найден, создайте его в HA")
         return "Таймер не настроен. Создайте timer.assistant_timer в Home Assistant"
 
